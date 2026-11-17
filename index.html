@@ -1,0 +1,56 @@
+<!doctype html><html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>抖店经营数据看板 · Demo</title>
+<script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0}body{background:#0b0f1a;color:#e6ebf5;font-family:-apple-system,"PingFang SC","Microsoft YaHei",sans-serif;padding:20px}
+header{display:flex;justify-content:space-between;align-items:center;margin-bottom:18px;flex-wrap:wrap;gap:10px}
+h1{font-size:22px;letter-spacing:1px}h1 span{color:#fe2c55}.sub{color:#8b93a7;font-size:13px}
+.ranges button{background:#151b2b;color:#c9d1e3;border:1px solid #232b40;padding:6px 14px;border-radius:6px;cursor:pointer;margin-left:6px}
+.ranges button.on{background:#fe2c55;border-color:#fe2c55;color:#fff}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(160px,1fr));gap:12px;margin-bottom:12px}
+.k{background:linear-gradient(160deg,#151b2b,#10151f);border:1px solid #1e2638;border-radius:12px;padding:14px 16px}
+.k .l{color:#8b93a7;font-size:12px}.k .v{font-size:24px;font-weight:700;margin:6px 0 2px}.k .d{font-size:12px}.up{color:#25c48b}.down{color:#fe5c5c}
+.grid{display:grid;grid-template-columns:2fr 1fr;gap:12px;margin-bottom:12px}.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:12px}
+.card{background:#121827;border:1px solid #1e2638;border-radius:12px;padding:14px}.card h3{font-size:14px;color:#c9d1e3;margin-bottom:8px}
+.ch{height:300px}table{width:100%;border-collapse:collapse;font-size:13px}th,td{padding:8px 6px;text-align:left;border-bottom:1px solid #1e2638}th{color:#8b93a7;font-weight:400}
+.tag{padding:2px 6px;border-radius:4px;font-size:11px}.warn{background:#3a1d24;color:#fe7c8c}.ok{background:#14302a;color:#4fd1a1}
+.alert{background:#2a1a10;border:1px solid #5a3412;color:#ffb36b;border-radius:10px;padding:10px 14px;font-size:13px;margin-bottom:12px}
+footer{color:#5c6478;font-size:12px;text-align:center;margin-top:14px}
+@media(max-width:900px){.grid,.grid3{grid-template-columns:1fr}}
+</style></head><body>
+<header><div><h1><span>●</span> 某女装旗舰店 · 抖店经营看板</h1><div class="sub" id="src">数据加载中…</div></div>
+<div class="ranges"><button data-r="7">近7天</button><button data-r="30" class="on">近30天</button><button data-r="90">近90天</button></div></header>
+<div class="alert" id="alert"></div>
+<div class="kpis" id="kpis"></div>
+<div class="grid"><div class="card"><h3>GMV 与订单趋势</h3><div class="ch" id="trend"></div></div><div class="card"><h3>成交渠道占比</h3><div class="ch" id="chan"></div></div></div>
+<div class="grid3"><div class="card"><h3>千川投流 ROI</h3><div class="ch" id="roi"></div></div><div class="card"><h3>退款金额与退款率</h3><div class="ch" id="refund"></div></div><div class="card"><h3>买家地域 TOP10</h3><div class="ch" id="region"></div></div></div>
+<div class="card"><h3>商品排行 TOP10</h3><table id="prod"></table></div>
+<footer>Demo · 数据为模拟数据 · 支持对接抖店开放平台 / 巨量千川 API 自动更新</footer>
+<script>
+const SB_URL="https://slfoiuqulbwchysgmjjr.supabase.co",SB_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InNsZm9pdXF1bGJ3Y2h5c2dtampyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTQ4OTcxNzQsImV4cCI6MjExMDQ3MzE3NH0.Yjrl1tD9DvJPtitLa9pYNbAgzYZoYp_02uKwHWU8Gzk";
+const C=['#fe2c55','#25f4ee','#7c5cff','#ffb020'];
+async function sb(t,q=''){const r=await fetch(`${SB_URL}/rest/v1/${t}?select=*${q}`,{headers:{apikey:SB_KEY,Authorization:'Bearer '+SB_KEY}});if(!r.ok)throw 0;return r.json()}
+let D;
+async function load(){try{const [daily,channels,products,regions]=await Promise.all([sb('daily_metrics','&order=date'),sb('channel_gmv','&order=date'),sb('products','&order=gmv.desc'),sb('regions','&order=share.desc')]);D={daily,channels,products,regions};src.textContent='实时数据源：Supabase · 每日自动同步'}catch(e){D=await (await fetch('fallback.json')).json();src.textContent='离线演示数据'}render(30)}
+const n=v=>Number(v),fmt=v=>v>=1e4?(v/1e4).toFixed(1)+'万':Math.round(v).toLocaleString(),pct=v=>(v*100).toFixed(1)+'%';
+const charts={};function ch(id){return charts[id]||(charts[id]=echarts.init(document.getElementById(id),'dark',{renderer:'canvas'}))}
+const base={backgroundColor:'transparent',textStyle:{fontFamily:'PingFang SC'},grid:{left:50,right:20,top:30,bottom:30},tooltip:{trigger:'axis'}};
+function sum(a,k){return a.reduce((s,x)=>s+n(x[k]),0)}
+function render(r){const all=D.daily,cur=all.slice(-r),prev=all.slice(-2*r,-r);
+const m=a=>({gmv:sum(a,'gmv'),orders:sum(a,'orders'),vis:sum(a,'visitors'),ref:sum(a,'refund_amount'),ad:sum(a,'ad_spend'),adg:sum(a,'ad_gmv')});
+const c=m(cur),p=m(prev);const d=(a,b,inv)=>{if(!b)return'';const x=(a-b)/b,good=inv?x<0:x>0;return `<span class="${good?'up':'down'}">${x>0?'▲':'▼'} ${pct(Math.abs(x))}</span> 较上期`};
+const K=[['成交额 GMV','¥'+fmt(c.gmv),d(c.gmv,p.gmv)],['订单数',fmt(c.orders),d(c.orders,p.orders)],['客单价','¥'+(c.gmv/c.orders).toFixed(1),d(c.gmv/c.orders,p.gmv/p.orders)],['转化率',pct(c.orders/c.vis),d(c.orders/c.vis,p.orders/p.vis)],['退款率',pct(c.ref/c.gmv),d(c.ref/c.gmv,p.ref/p.gmv,1)],['千川 ROI',(c.adg/c.ad).toFixed(2),d(c.adg/c.ad,p.adg/p.ad)],['店铺体验分',n(cur.at(-1).dsr).toFixed(2),'']];
+kpis.innerHTML=K.map(k=>`<div class="k"><div class="l">${k[0]}</div><div class="v">${k[1]}</div><div class="d">${k[2]}</div></div>`).join('');
+const low=D.products.filter(x=>n(x.stock)<300),hiRef=D.products.filter(x=>n(x.refund_rate)>.12);
+alert.innerHTML=`⚠ 经营提醒：${low.map(x=>x.name).join('、')||'无'} 库存不足 300 件；${hiRef.map(x=>x.name).join('、')||'无'} 退款率超 12%，建议排查尺码描述。`;
+const dates=cur.map(x=>x.date.slice(5));
+ch('trend').setOption({...base,legend:{data:['GMV','订单'],textStyle:{color:'#aaa'}},xAxis:{data:dates},yAxis:[{name:'GMV'},{name:'订单',splitLine:{show:false}}],series:[{name:'GMV',type:'line',smooth:true,data:cur.map(x=>n(x.gmv)),areaStyle:{opacity:.15},color:C[0]},{name:'订单',type:'bar',yAxisIndex:1,data:cur.map(x=>n(x.orders)),color:C[1],barMaxWidth:10,itemStyle:{opacity:.5}}]},true);
+const cs={};D.channels.filter(x=>x.date>=cur[0].date).forEach(x=>cs[x.channel]=(cs[x.channel]||0)+n(x.gmv));
+ch('chan').setOption({...base,tooltip:{trigger:'item',formatter:'{b}: ¥{c} ({d}%)'},series:[{type:'pie',radius:['45%','72%'],color:C,label:{color:'#ccc'},data:Object.entries(cs).map(([k,v])=>({name:k,value:Math.round(v)}))}]},true);
+ch('roi').setOption({...base,legend:{data:['消耗','ROI'],textStyle:{color:'#aaa'}},xAxis:{data:dates},yAxis:[{name:'消耗'},{name:'ROI',splitLine:{show:false}}],series:[{name:'消耗',type:'bar',data:cur.map(x=>n(x.ad_spend)),color:C[2],barMaxWidth:10},{name:'ROI',type:'line',yAxisIndex:1,smooth:true,data:cur.map(x=>(n(x.ad_gmv)/n(x.ad_spend)).toFixed(2)),color:C[3]}]},true);
+ch('refund').setOption({...base,xAxis:{data:dates},yAxis:[{name:'退款额'},{name:'退款率%',splitLine:{show:false}}],series:[{type:'bar',name:'退款额',data:cur.map(x=>n(x.refund_amount)),color:'#fe5c5c',barMaxWidth:10},{type:'line',name:'退款率',yAxisIndex:1,smooth:true,data:cur.map(x=>(n(x.refund_amount)/n(x.gmv)*100).toFixed(1)),color:'#ffb020'}]},true);
+const rg=[...D.regions].reverse();ch('region').setOption({...base,grid:{left:50,right:30,top:10,bottom:20},tooltip:{trigger:'axis',formatter:p=>p[0].name+': '+p[0].value+'%'},xAxis:{type:'value'},yAxis:{type:'category',data:rg.map(x=>x.province)},series:[{type:'bar',data:rg.map(x=>n(x.share)),color:C[1],barMaxWidth:12}]},true);
+prod.innerHTML='<tr><th>#</th><th>商品</th><th>售价</th><th>销量</th><th>GMV</th><th>退款率</th><th>库存</th><th>评分</th></tr>'+D.products.map((x,i)=>`<tr><td>${i+1}</td><td>${x.name}</td><td>¥${n(x.price)}</td><td>${fmt(n(x.sales))}</td><td>¥${fmt(n(x.gmv))}</td><td><span class="tag ${n(x.refund_rate)>.12?'warn':'ok'}">${pct(n(x.refund_rate))}</span></td><td>${n(x.stock)<300?'<span class="tag warn">'+x.stock+'</span>':x.stock}</td><td>${n(x.rating)}</td></tr>`).join('');}
+document.querySelectorAll('.ranges button').forEach(b=>b.onclick=()=>{document.querySelectorAll('.ranges button').forEach(x=>x.classList.remove('on'));b.classList.add('on');render(+b.dataset.r)});
+addEventListener('resize',()=>Object.values(charts).forEach(c=>c.resize()));load();
+</script></body></html>
